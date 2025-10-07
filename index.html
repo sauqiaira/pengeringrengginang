@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pengering Kerupuk Otomatis IoT - Sensor DS18B20</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        color: #333;
+        overflow-x: hidden;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      header {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 25px;
+        border-radius: 20px;
+        margin-bottom: 25px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        backdrop-filter: blur(15px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+
+      header h1 {
+        color: #2c3e50;
+        font-size: 2.2rem;
+        font-weight: 700;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: rgba(255, 255, 255, 0.7);
+        padding: 12px 20px;
+        border-radius: 25px;
+        font-weight: 600;
+      }
+
+      .status-dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+      }
+
+      .status-dot.online {
+        background: #27ae60;
+        box-shadow: 0 0 15px rgba(39, 174, 96, 0.6);
+      }
+
+      .status-dot.offline {
+        background: #e74c3c;
+        box-shadow: 0 0 15px rgba(231, 76, 60, 0.6);
+      }
+
+      @keyframes pulse {
+        0% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.7;
+          transform: scale(1.1);
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      .dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 25px;
+      }
+
+      .panel {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 30px;
+        border-radius: 20px;
+        box-shadow: 0 15px 50px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(15px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      .panel:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+      }
+
+      .panel h2 {
+        color: #2c3e50;
+        margin-bottom: 25px;
+        font-size: 1.4rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 3px solid #3498db;
+        padding-bottom: 10px;
+      }
+
+      .sensor-panel {
+        grid-column: 1 / -1;
+      }
+
+      .sensor-card {
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+        color: white;
+        padding: 40px;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        gap: 30px;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 25px;
+      }
+
+      .sensor-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.1));
+        pointer-events: none;
+      }
+
+      .sensor-card:hover {
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: 0 15px 40px rgba(231, 76, 60, 0.4);
+      }
+
+      .sensor-icon {
+        font-size: 4rem;
+        opacity: 0.9;
+        animation: sensorPulse 3s infinite;
+      }
+
+      @keyframes sensorPulse {
+        0%,
+        100% {
+          opacity: 0.9;
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.1);
+        }
+      }
+
+      .sensor-info {
+        flex: 1;
+      }
+
+      .sensor-info h3 {
+        font-size: 1.5rem;
+        opacity: 0.9;
+        margin-bottom: 15px;
+        font-weight: 500;
+      }
+
+      .sensor-value {
+        font-size: 4rem;
+        font-weight: 700;
+        display: block;
+        margin-bottom: 15px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      .sensor-status {
+        font-size: 1.2rem;
+        opacity: 0.9;
+        padding: 8px 20px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
+        font-weight: 600;
+        display: inline-block;
+      }
+
+      .sensor-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 20px;
+        margin-top: 25px;
+      }
+
+      .detail-item {
+        background: rgba(255, 255, 255, 0.15);
+        padding: 20px;
+        border-radius: 15px;
+        text-align: center;
+        backdrop-filter: blur(5px);
+      }
+
+      .detail-item h4 {
+        font-size: 1rem;
+        opacity: 0.8;
+        margin-bottom: 8px;
+      }
+
+      .detail-value {
+        font-size: 1.8rem;
+        font-weight: bold;
+      }
+
+      .control-grid {
+        display: grid;
+        gap: 20px;
+      }
+
+      .control-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        border-radius: 15px;
+        border: 2px solid transparent;
+        transition: all 0.3s ease;
+        font-weight: 600;
+      }
+
+      .control-item:hover {
+        border-color: #3498db;
+        background: linear-gradient(135deg, #ffffff, #f8f9fa);
+        transform: translateX(5px);
+      }
+
+      .control-item label {
+        font-size: 1.1rem;
+        color: #2c3e50;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .switch-container {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+
+      .switch {
+        display: none;
+      }
+
+      .switch-label {
+        display: block;
+        width: 60px;
+        height: 30px;
+        background: #bdc3c7;
+        border-radius: 30px;
+        cursor: pointer;
+        position: relative;
+        transition: all 0.4s ease;
+        box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.2);
+      }
+
+      .switch-label::after {
+        content: "";
+        position: absolute;
+        width: 26px;
+        height: 26px;
+        background: white;
+        border-radius: 50%;
+        top: 2px;
+        left: 2px;
+        transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+      }
+
+      .switch:checked + .switch-label {
+        background: linear-gradient(135deg, #27ae60, #229954);
+        box-shadow: 0 0 15px rgba(39, 174, 96, 0.4);
+      }
+
+      .switch:checked + .switch-label::after {
+        transform: translateX(30px);
+      }
+
+      .status-text {
+        font-weight: bold;
+        min-width: 50px;
+        font-size: 1rem;
+        text-align: center;
+      }
+
+      .ml-panel {
+        background: linear-gradient(135deg, rgba(155, 89, 182, 0.1), rgba(142, 68, 173, 0.1));
+        border: 2px solid #9b59b6;
+      }
+
+      .ml-info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 20px;
+      }
+
+      .prediction-card {
+        background: linear-gradient(135deg, #3498db, #2980b9);
+        color: white;
+        padding: 25px;
+        border-radius: 15px;
+        text-align: center;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .prediction-card:nth-child(2) {
+        background: linear-gradient(135deg, #f39c12, #e67e22);
+      }
+
+      .prediction-card:nth-child(3) {
+        background: linear-gradient(135deg, #9b59b6, #8e44ad);
+      }
+
+      .prediction-card:hover {
+        transform: scale(1.05) rotate(2deg);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      }
+
+      .prediction-card h3 {
+        font-size: 1rem;
+        margin-bottom: 12px;
+        opacity: 0.9;
+        font-weight: 500;
+      }
+
+      .prediction-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        display: block;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .chart-panel {
+        grid-column: 1 / -1;
+      }
+
+      #temperatureChart {
+        max-height: 350px;
+      }
+
+      .status-grid {
+        display: grid;
+        gap: 15px;
+        margin-bottom: 25px;
+      }
+
+      .status-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 20px;
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        border-radius: 12px;
+        border-left: 4px solid #3498db;
+        transition: all 0.3s ease;
+      }
+
+      .status-item:hover {
+        background: linear-gradient(135deg, #ffffff, #f8f9fa);
+        transform: translateX(5px);
+      }
+
+      .status-label {
+        font-weight: 600;
+        color: #2c3e50;
+      }
+
+      .status-value {
+        font-weight: 700;
+        color: #3498db;
+        font-size: 1.1rem;
+      }
+
+      .control-buttons {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        padding: 15px 25px;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: all 0.3s ease;
+        flex: 1;
+        min-width: 140px;
+        justify-content: center;
+        font-size: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+      }
+
+      .btn-start {
+        background: linear-gradient(135deg, #27ae60, #229954);
+        color: white;
+      }
+
+      .btn-stop {
+        background: linear-gradient(135deg, #e74c3c, #c0392b);
+        color: white;
+      }
+
+      .btn-auto {
+        background: linear-gradient(135deg, #f39c12, #e67e22);
+        color: white;
+      }
+
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(10px);
+      }
+
+      .modal-content {
+        background: linear-gradient(135deg, #ffffff, #f8f9fa);
+        margin: 10% auto;
+        padding: 40px;
+        border-radius: 20px;
+        width: 90%;
+        max-width: 500px;
+        position: relative;
+        animation: modalSlideIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      }
+
+      @keyframes modalSlideIn {
+        from {
+          transform: translateY(-100px) scale(0.8);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0) scale(1);
+          opacity: 1;
+        }
+      }
+
+      .close {
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        font-size: 2rem;
+        cursor: pointer;
+        color: #bdc3c7;
+        transition: all 0.3s ease;
+      }
+
+      .close:hover {
+        color: #e74c3c;
+        transform: scale(1.2);
+      }
+
+      .alert-content {
+        text-align: center;
+        padding: 20px;
+      }
+
+      .alert-content i {
+        font-size: 4rem;
+        margin-bottom: 20px;
+        animation: alertPulse 1s infinite;
+      }
+
+      @keyframes alertPulse {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.1);
+        }
+      }
+
+      .alert-content h3 {
+        font-size: 1.5rem;
+        margin-bottom: 15px;
+        color: #2c3e50;
+      }
+
+      .alert-content p {
+        font-size: 1.1rem;
+        color: #7f8c8d;
+      }
+
+      .decision-tree-display {
+        background: linear-gradient(135deg, #ecf0f1, #d5dbdb);
+        padding: 20px;
+        border-radius: 15px;
+        margin-top: 20px;
+        border-left: 5px solid #9b59b6;
+      }
+
+      .decision-node {
+        background: white;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 10px;
+        border-left: 4px solid #3498db;
+        font-family: "Courier New", monospace;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+      }
+
+      .decision-node:hover {
+        background: #f8f9fa;
+        transform: translateX(5px);
+      }
+
+      .decision-node.active {
+        background: linear-gradient(135deg, #d5f4e6, #a8e6cf);
+        border-left-color: #27ae60;
+        font-weight: bold;
+      }
+
+      .buzzer-indicator {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #e74c3c;
+        color: white;
+        padding: 15px 20px;
+        border-radius: 10px;
+        display: none;
+        animation: buzzerAlert 0.5s infinite;
+        z-index: 999;
+        box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+      }
+
+      @keyframes buzzerAlert {
+        0%,
+        100% {
+          transform: scale(1);
+          background: #e74c3c;
+        }
+        50% {
+          transform: scale(1.05);
+          background: #c0392b;
+        }
+      }
+
+      .ml-status {
+        background: linear-gradient(135deg, #9b59b6, #8e44ad);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        text-align: center;
+        font-weight: 600;
+      }
+
+      @media (max-width: 768px) {
+        .container {
+          padding: 15px;
+        }
+
+        header {
+          padding: 20px;
+          flex-direction: column;
+          gap: 15px;
+        }
+
+        header h1 {
+          font-size: 1.8rem;
+        }
+
+        .dashboard {
+          grid-template-columns: 1fr;
+        }
+
+        .control-buttons {
+          flex-direction: column;
+        }
+
+        .btn {
+          min-width: auto;
+        }
+
+        .sensor-card {
+          flex-direction: column;
+          text-align: center;
+          gap: 20px;
+        }
+
+        .sensor-details {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1><i class="fas fa-fire"></i> Pengering Kerupuk Otomatis IoT - DS18B20</h1>
+        <div class="status-indicator">
+          <span id="connection-status" class="status-dot offline"></span>
+          <span>Status Koneksi IoT</span>
+        </div>
+      </header>
+
+      <div class="dashboard">
+        <!-- Panel Sensor DS18B20 -->
+        <div class="panel sensor-panel">
+          <h2><i class="fas fa-thermometer-half"></i> Sensor Suhu DS18B20</h2>
+          <div class="sensor-card">
+            <div class="sensor-icon">
+              <i class="fas fa-temperature-high"></i>
+            </div>
+            <div class="sensor-info">
+              <h3>Suhu Ruang Pengering</h3>
+              <span id="temperature" class="sensor-value">25.0°C</span>
+              <div class="sensor-status" id="temp-status">Normal</div>
+            </div>
+          </div>
+          <div class="sensor-details">
+            <div class="detail-item">
+              <h4>Suhu Minimum</h4>
+              <div class="detail-value" id="min-temp">--°C</div>
+            </div>
+            <div class="detail-item">
+              <h4>Suhu Maksimum</h4>
+              <div class="detail-value" id="max-temp">--°C</div>
+            </div>
+            <div class="detail-item">
+              <h4>Suhu Rata-rata</h4>
+              <div class="detail-value" id="avg-temp">--°C</div>
+            </div>
+            <div class="detail-item">
+              <h4>Trend Suhu</h4>
+              <div class="detail-value" id="temp-trend">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel Kontrol Perangkat -->
+        <div class="panel control-panel">
+          <h2><i class="fas fa-cogs"></i> Kontrol Perangkat</h2>
+          <div class="control-grid">
+            <div class="control-item">
+              <label><i class="fas fa-snowflake"></i> Kipas Pendingin</label>
+              <div class="switch-container">
+                <input type="checkbox" id="cooling-fan" class="switch" />
+                <label for="cooling-fan" class="switch-label"></label>
+                <span id="cooling-status" class="status-text">OFF</span>
+              </div>
+            </div>
+            <div class="control-item">
+              <label><i class="fas fa-wind"></i> Kipas Penyebar Panas</label>
+              <div class="switch-container">
+                <input type="checkbox" id="heat-fan" class="switch" />
+                <label for="heat-fan" class="switch-label"></label>
+                <span id="heat-fan-status" class="status-text">OFF</span>
+              </div>
+            </div>
+            <div class="control-item">
+              <label><i class="fas fa-fire-flame-curved"></i> Heater/Pemanas</label>
+              <div class="switch-container">
+                <input type="checkbox" id="heater" class="switch" />
+                <label for="heater" class="switch-label"></label>
+                <span id="heater-status" class="status-text">OFF</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel Machine Learning Decision Tree -->
+        <div class="panel ml-panel">
+          <h2><i class="fas fa-brain"></i> AI Decision Tree</h2>
+          <div class="ml-info">
+            <div class="prediction-card">
+              <h3>Prediksi Waktu Pengeringan</h3>
+              <span id="drying-time" class="prediction-value">-- menit</span>
+            </div>
+            <div class="prediction-card">
+              <h3>Suhu Target Optimal</h3>
+              <span id="recommended-temp" class="prediction-value">--°C</span>
+            </div>
+          </div>
+          <div class="decision-tree-display">
+            <h4><i class="fas fa-sitemap"></i> Decision Tree Status:</h4>
+            <div id="current-decision" class="decision-node">Sistem dalam mode standby - menunggu data sensor...</div>
+          </div>
+        </div>
+
+        <!-- Panel Grafik Real-time -->
+        <div class="panel chart-panel">
+          <h2><i class="fas fa-chart-line"></i> Grafik Suhu Real-time</h2>
+          <canvas id="temperatureChart"></canvas>
+        </div>
+
+        <!-- Panel Status & Kontrol -->
+        <div class="panel status-panel">
+          <h2><i class="fas fa-info-circle"></i> Status & Kontrol Sistem</h2>
+          <div class="status-grid">
+            <div class="status-item">
+              <span class="status-label"><i class="fas fa-microchip"></i> Mode Operasi:</span>
+              <span id="operation-mode" class="status-value">Manual</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label"><i class="fas fa-clock"></i> Waktu Berjalan:</span>
+              <span id="runtime" class="status-value">00:00:00</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label"><i class="fas fa-tasks"></i> Status Proses:</span>
+              <span id="process-status" class="status-value">Standby</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label"><i class="fas fa-thermometer"></i> Target Suhu:</span>
+              <span id="target-temp" class="status-value">60°C</span>
+              <a href="#" id="edit-temp-btn" style="margin-left: 10px; color: #3498db">
+                <i class="fas fa-edit"></i>
+              </a>
+            </div>
+            <div class="status-item">
+              <span class="status-label"><i class="fas fa-memory"></i> Sensor Status:</span>
+              <span id="sensor-status" class="status-value">DS18B20 OK</span>
+            </div>
+          </div>
+          <div class="control-buttons">
+            <button id="start-btn" class="btn btn-start"><i class="fas fa-play"></i> Mulai Pengeringan</button>
+            <button id="stop-btn" class="btn btn-stop" disabled><i class="fas fa-stop"></i> Berhenti</button>
+            <button id="auto-btn" class="btn btn-auto"><i class="fas fa-robot"></i> Mode Auto ML</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Buzzer Indicator -->
+      <div id="buzzer-indicator" class="buzzer-indicator"><i class="fas fa-bell"></i> <span id="buzzer-message">Alert!</span></div>
+
+      <!-- Alert Modal -->
+      <div id="alert-modal" class="modal">
+        <div class="modal-content">
+          <span class="close">&times;</span>
+          <div class="alert-content">
+            <i id="alert-icon" class="fas fa-exclamation-triangle" style="color: #e74c3c"></i>
+            <h3 id="alert-title">Sistem Alert</h3>
+            <p id="alert-message">Sistem mendeteksi kondisi yang memerlukan perhatian</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      // Import fungsi yang dibutuhkan dari Firebase SDK
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
+      import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-database.js";
+
+      // Konfigurasi Firebase Anda
+      const firebaseConfig = {
+        apiKey: "AIzaSyBabSsOeDNPh6HsY7ph-mHpOVj5CPVhABY",
+        authDomain: "pengering-kerupuk-iot.firebaseapp.com",
+        databaseURL: "https://pengering-kerupuk-iot-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "pengering-kerupuk-iot",
+        storageBucket: "pengering-kerupuk-iot.appspot.com",
+        messagingSenderId: "923736753554",
+        appId: "1:923736753554:web:7e9829e332e25d0784ed4b",
+      };
+
+      // Inisialisasi Firebase
+      const app = initializeApp(firebaseConfig);
+      const database = getDatabase(app);
+      console.log("Firebase berhasil diinisialisasi. Menunggu data...");
+
+      // ==========================================================
+      // DEKLARASI VARIABEL DAN FUNGSI GRAFIK
+      // ==========================================================
+      let chart = null;
+      let temperatureHistory = [];
+
+      function initializeChart() {
+        const ctx = document.getElementById("temperatureChart").getContext("2d");
+        chart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "Suhu Aktual (°C)",
+                data: [],
+                borderColor: "#e74c3c",
+                backgroundColor: "rgba(231, 76, 60, 0.1)",
+                tension: 0.4,
+                fill: true,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: { min: 20, max: 100 },
+              x: { title: { display: true, text: "Waktu" } },
+            },
+          },
+        });
+      }
+
+      function updateChart(newTemp) {
+        if (!chart) return;
+        const now = new Date().toLocaleTimeString("id-ID");
+        if (chart.data.labels.length > 20) {
+          chart.data.labels.shift();
+          chart.data.datasets[0].data.shift();
+        }
+        chart.data.labels.push(now);
+        chart.data.datasets[0].data.push(newTemp);
+        chart.update("none");
+      }
+
+      // ==========================================================
+      // LISTENER UTAMA (SUMBER SEMUA DATA REAL-TIME)
+      // ==========================================================
+      const stateRef = ref(database, "drying_machine/state");
+
+      onValue(stateRef, (snapshot) => {
+        const state = snapshot.val();
+        if (state && state.temperature !== undefined) {
+          // --- BAGIAN 1: UPDATE SUHU & STATISTIK ---
+          const suhu = parseFloat(state.temperature);
+          document.getElementById("temperature").textContent = `${suhu.toFixed(1)}°C`;
+          document.getElementById("connection-status").className = "status-dot online";
+
+          // PANGGIL FUNGSI UPDATE CHART DI SINI <--- INI BAGIAN YANG DITAMBAHKAN
+          updateChart(suhu);
+
+          temperatureHistory.push(suhu);
+          if (temperatureHistory.length > 100) {
+            temperatureHistory.shift();
+          }
+          if (temperatureHistory.length > 0) {
+            const minTemp = Math.min(...temperatureHistory);
+            const maxTemp = Math.max(...temperatureHistory);
+            const avgTemp = temperatureHistory.reduce((a, b) => a + b, 0) / temperatureHistory.length;
+            document.getElementById("min-temp").textContent = `${minTemp.toFixed(1)}°C`;
+            document.getElementById("max-temp").textContent = `${maxTemp.toFixed(1)}°C`;
+            document.getElementById("avg-temp").textContent = `${avgTemp.toFixed(1)}°C`;
+            if (temperatureHistory.length >= 5) {
+              const last = temperatureHistory.slice(-1)[0];
+              const previous = temperatureHistory.slice(-5, -4)[0];
+              if (last > previous + 0.5) document.getElementById("temp-trend").textContent = "Naik ↗";
+              else if (last < previous - 0.5) document.getElementById("temp-trend").textContent = "Turun ↘";
+              else document.getElementById("temp-trend").textContent = "Stabil →";
+            }
+          }
+          // --- BAGIAN 2: UPDATE STATUS SWITCH ---
+          document.getElementById("heater").checked = state.heater_status;
+          document.getElementById("heater-status").textContent = state.heater_status ? "ON" : "OFF";
+          document.getElementById("heat-fan").checked = state.fan_hot_status;
+          document.getElementById("heat-fan-status").textContent = state.fan_hot_status ? "ON" : "OFF";
+          document.getElementById("cooling-fan").checked = state.cooling_status;
+          document.getElementById("cooling-status").textContent = state.cooling_status ? "ON" : "OFF";
+
+          // --- BAGIAN 3: UPDATE SISA PANEL STATUS ---
+          const processStatus = state.process_status || "Idle";
+          const elapsedTimeMs = parseInt(state.elapsed_time_ms || "0");
+
+          // Update teks "Status Proses"
+          document.getElementById("process-status").textContent = processStatus;
+
+          // Update teks "Waktu Berjalan"
+          const hours = Math.floor(elapsedTimeMs / 3600000)
+            .toString()
+            .padStart(2, "0");
+          const minutes = Math.floor((elapsedTimeMs % 3600000) / 60000)
+            .toString()
+            .padStart(2, "0");
+          const seconds = Math.floor((elapsedTimeMs % 60000) / 1000)
+            .toString()
+            .padStart(2, "0");
+          document.getElementById("runtime").textContent = `${hours}:${minutes}:${seconds}`;
+
+          //   Buzzer
+          if (state.buzzer_status) {
+            document.getElementById("buzzer-indicator").style.display = "block";
+            document.getElementById("buzzer-message").textContent = "Buzzer AKTIF!";
+          } else {
+            document.getElementById("buzzer-indicator").style.display = "none";
+          }
+          // --- BAGIAN 4: UPDATE PANEL AI ---
+          const TOTAL_DRYING_TIME_MS = 15 * 60 * 1000; // 15 Menit
+
+          if (processStatus === "Drying") {
+            const remainingTimeMs = TOTAL_DRYING_TIME_MS - elapsedTimeMs;
+            const remainingMinutes = Math.max(0, Math.ceil(remainingTimeMs / 60000));
+            document.getElementById("drying-time").textContent = `${remainingMinutes} menit`;
+            document.getElementById("recommended-temp").textContent = `55-60°C`;
+          } else {
+            document.getElementById("drying-time").textContent = `-- menit`;
+            document.getElementById("recommended-temp").textContent = `--°C`;
+          }
+          // --- BAGIAN 5: UPDATE STATUS TOMBOL KONTROL ---
+          const startBtn = document.getElementById("start-btn");
+          const stopBtn = document.getElementById("stop-btn");
+
+          if (processStatus === "Drying" || processStatus === "Cooling") {
+            // Jika sedang berjalan, nonaktifkan tombol Mulai dan aktifkan tombol Berhenti
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+          } else {
+            // Jika sedang berhenti (Idle), aktifkan tombol Mulai dan nonaktifkan tombol Berhenti
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+          }
+        }
+      });
+
+      // ==========================================================
+      // PENGIRIM PERINTAH
+      // ==========================================================
+      const startBtn = document.getElementById("start-btn");
+      const stopBtn = document.getElementById("stop-btn");
+      const autoBtn = document.getElementById("auto-btn");
+
+      function sendCommand(command) {
+        console.log("Mengirim perintah:", command);
+        const updates = {};
+        updates["/drying_machine/commands"] = command;
+        return update(ref(database), updates);
+      }
+      startBtn.addEventListener("click", () => sendCommand({ method: "start" }));
+      stopBtn.addEventListener("click", () => sendCommand({ method: "stop" }));
+      autoBtn.addEventListener("click", () => sendCommand({ method: "auto" }));
+      document.getElementById("heater").addEventListener("change", (e) => sendCommand({ method: "set_heater", params: { state: e.target.checked } }));
+      document.getElementById("heat-fan").addEventListener("change", (e) => sendCommand({ method: "set_heat_fan", params: { state: e.target.checked } }));
+      document.getElementById("cooling-fan").addEventListener("change", (e) => sendCommand({ method: "set_cooling_fan", params: { state: e.target.checked } }));
+
+      initializeChart();
+      // ==========================================================
+      // LOGIKA BARU UNTUK MODE OTOMATIS / MANUAL
+      // ==========================================================
+      let isAutoMode = true; // Default mode saat halaman dibuka adalah Otomatis
+      // Kumpulkan semua switch manual dalam satu grup
+      const manualSwitches = [document.getElementById("heater"), document.getElementById("heat-fan"), document.getElementById("cooling-fan")];
+
+      // Fungsi untuk memperbarui tampilan berdasarkan mode
+      function updateModeUI(mode) {
+        const modeDisplay = document.getElementById("operation-mode");
+        isAutoMode = mode; // Update variabel global
+
+        if (isAutoMode) {
+          // Tampilan untuk Mode OTOMATIS
+          modeDisplay.textContent = "Otomatis";
+          autoBtn.innerHTML = '<i class="fas fa-robot"></i> Mode Auto (AKTIF)';
+          autoBtn.style.background = "linear-gradient(135deg, #27ae60, #229954)";
+
+          // Kunci (disable) semua switch manual
+          manualSwitches.forEach((sw) => (sw.disabled = true));
+        } else {
+          // Tampilan untuk Mode MANUAL
+          modeDisplay.textContent = "Manual";
+          autoBtn.innerHTML = '<i class="fas fa-user-cog"></i> Mode Manual (AKTIF)';
+          autoBtn.style.background = "linear-gradient(135deg, #3498db, #2980b9)";
+
+          // Buka kunci (enable) semua switch manual
+          manualSwitches.forEach((sw) => (sw.disabled = false));
+        }
+      }
+
+      // Event listener saat tombol mode ditekan
+      autoBtn.addEventListener("click", () => {
+        const newMode = !isAutoMode; // Balikkan mode saat ini
+        console.log(`Mengubah mode ke: ${newMode ? "Otomatis" : "Manual"}`);
+
+        // Kirim status mode baru ke Firebase
+        const updates = {};
+        updates["/drying_machine/config/is_auto_mode"] = newMode;
+        update(ref(database), updates);
+      });
+
+      // Listener untuk mendengarkan perubahan mode dari Firebase
+      const autoModeRef = ref(database, "drying_machine/config/is_auto_mode");
+      onValue(autoModeRef, (snapshot) => {
+        const modeFromFirebase = snapshot.val();
+        if (modeFromFirebase !== null) {
+          // Panggil fungsi untuk update UI sesuai data dari Firebase
+          updateModeUI(modeFromFirebase);
+        } else {
+          // Jika tidak ada data di Firebase, gunakan mode default (Otomatis)
+          updateModeUI(true);
+        }
+      });
+      // ==========================================================
+      // LOGIKA BARU UNTUK EDIT TARGET SUHU
+      // ==========================================================
+      const editTempBtn = document.getElementById("edit-temp-btn");
+      const targetTempDisplay = document.getElementById("target-temp");
+
+      editTempBtn.addEventListener("click", (event) => {
+        event.preventDefault(); // Mencegah halaman refresh
+
+        // 1. Ambil nilai suhu saat ini dari tampilan
+        const currentTemp = parseFloat(targetTempDisplay.textContent);
+
+        // 2. Munculkan prompt untuk input dari pengguna
+        const newTemp = window.prompt("Masukkan target suhu baru (antara 40-80°C):", currentTemp);
+
+        // 3. Validasi input
+        if (newTemp === null || newTemp.trim() === "") {
+          // Jika pengguna menekan "Cancel" atau mengosongkan input, jangan lakukan apa-apa
+          return;
+        }
+
+        const newTempFloat = parseFloat(newTemp);
+        if (!isNaN(newTempFloat) && newTempFloat >= 40 && newTempFloat <= 80) {
+          // 4. Jika input valid, kirim ke Firebase
+          console.log(`Mengirim target suhu baru: ${newTempFloat}°C`);
+
+          const updates = {};
+          updates["/drying_machine/config/target_suhu"] = newTempFloat;
+          update(ref(database), updates);
+        } else {
+          // Jika input tidak valid, beri peringatan
+          alert("Input tidak valid! Harap masukkan angka antara 40 dan 80.");
+        }
+      });
+
+      // Tambahan: Buat tampilan target suhu ikut realtime
+      const targetTempRef = ref(database, "drying_machine/config/target_suhu");
+      onValue(targetTempRef, (snapshot) => {
+        const temp = snapshot.val();
+        if (temp !== null) {
+          targetTempDisplay.textContent = `${temp}°C`;
+        }
+      });
+    </script>
+  </body>
+</html>
